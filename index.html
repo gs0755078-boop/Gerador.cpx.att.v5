@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SENSI PRO V5 | CPX AKIRA</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.17.1/firebase-database-compat.js"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            background-color: #050505; 
+            color: #e2e8f0; 
+            font-family: 'Inter', sans-serif;
+            position: relative;
+            overflow-x: hidden;
+        }
+        /* IMAGEM DE FUNDO ATUALIZADA */
+        body::before {
+            content: "";
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: url('https://files.catbox.moe/kix2v8.jpg') no-repeat center center;
+            background-size: cover;
+            opacity: 0.25; /* Deixando a foto fraca no fundo */
+            z-index: -1;
+        }
+        .font-cyber { font-family: 'Orbitron', sans-serif; }
+        .glass { background: rgba(10, 10, 10, 0.85); backdrop-filter: blur(15px); border: 1px solid rgba(139, 92, 246, 0.3); }
+        .tab-btn { border-bottom: 2px solid transparent; transition: 0.3s; color: #666; font-weight: 900; }
+        .tab-btn.active { border-color: #8b5cf6; color: #fff; text-shadow: 0 0 10px rgba(139, 92, 246, 0.5); }
+        .input-dark { background: rgba(0, 0, 0, 0.7); border: 1px solid #333; border-radius: 12px; padding: 15px; width: 100%; outline: none; color: white; }
+        .card-sensi { background: rgba(20, 20, 20, 0.9); border: 1px solid rgba(139, 92, 246, 0.2); transition: 0.3s; }
+        .card-especial { background: rgba(139, 92, 246, 0.15); border: 1px solid rgba(139, 92, 246, 0.5); box-shadow: 0 0 15px rgba(139, 92, 246, 0.1); }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col items-center justify-center p-4">
+
+    <div id="login-screen" class="w-full max-w-sm glass p-8 rounded-[2.5rem] text-center shadow-2xl">
+        <h1 class="font-cyber text-2xl mb-8 text-white uppercase tracking-tighter">CPX <span class="text-purple-500">AKIRA</span></h1>
+        <input type="text" id="key-input" placeholder="SUA CHAVE AQUI" class="input-dark text-center font-bold uppercase mb-6 tracking-widest">
+        <button onclick="autenticar()" class="w-full bg-purple-600 hover:bg-purple-700 py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-lg shadow-purple-900/40 transition-all">Acessar Painel</button>
+    </div>
+
+    <div id="main-panel" class="hidden w-full max-w-md animate-in fade-in zoom-in duration-500">
+        <div class="flex mb-6 bg-black/60 rounded-2xl p-1 border border-zinc-800">
+            <button onclick="switchTab('gerador')" id="btn-tab-gerador" class="tab-btn active flex-1 py-3 text-[10px] uppercase tracking-widest">Gerar Sensi</button>
+            <button onclick="switchTab('info')" id="btn-tab-info" class="tab-btn flex-1 py-3 text-[10px] uppercase tracking-widest">Sobre a Key</button>
+        </div>
+
+        <div id="content-gerador" class="tab-content block">
+            <div class="glass p-6 rounded-[2rem] space-y-4">
+                <select id="brand" onchange="updateModels()" class="input-dark text-sm font-bold">
+                    <option value="">MARCA</option>
+                    <option value="APPLE">APPLE</option>
+                    <option value="SAMSUNG">SAMSUNG</option>
+                    <option value="MOTOROLA">MOTOROLA</option>
+                    <option value="XIAOMI">XIAOMI</option>
+                    <option value="REALME">REALME</option>
+                    <option value="INFINIX">INFINIX</option>
+                </select>
+
+                <select id="model" class="input-dark text-sm font-bold">
+                    <option value="">LINHA / MODELO</option>
+                </select>
+
+                <button onclick="gerarSensi()" class="w-full bg-white text-black py-4 rounded-2xl font-black uppercase text-[10px] tracking-widest mt-4 hover:shadow-[0_0_20px_rgba(255,255,255,0.2)]">Calibrar Sensi 200</button>
+                <div id="results" class="hidden pt-4 grid grid-cols-2 gap-3"></div>
+            </div>
+        </div>
+
+        <div id="content-info" class="tab-content hidden">
+            <div class="glass p-8 rounded-[2rem] text-center">
+                <p class="text-[8px] text-zinc-500 font-black uppercase mb-1">Licença Ativa</p>
+                <p id="info-key" class="font-mono text-purple-400 font-bold mb-6 text-lg tracking-widest"></p>
+                <div class="bg-black/60 p-5 rounded-2xl border border-zinc-800 text-left space-y-4">
+                    <div>
+                        <p class="text-[8px] text-zinc-500 uppercase font-black">Validade</p>
+                        <p id="info-validade" class="text-white font-bold text-sm italic"></p>
+                    </div>
+                    <div class="h-[1px] bg-zinc-800"></div>
+                    <p class="text-green-500 font-bold text-[10px] uppercase text-center">V4.0 Online & Calibrado</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Use suas credenciais do Firebase aqui
+        const firebaseConfig = {
+            apiKey: "AIzaSyADWH-HdJUFByEuHBdHZkf7mDSD1-dBnRA",
+            authDomain: "cpx-akira.firebaseapp.com",
+            databaseURL: "https://cpx-akira-default-rtdb.firebaseio.com",
+            projectId: "cpx-akira",
+            storageBucket: "cpx-akira.firebasestorage.app",
+            messagingSenderId: "126066483108",
+            appId: "1:126066483108:web:ecbc2bb38a8e3e8575eb31"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const devices = {
+            APPLE: ["Linha iPhone 7/8 Plus", "Linha iPhone X/XR/XS", "Linha iPhone 11", "Linha iPhone 12", "Linha iPhone 13", "Linha iPhone 14/15"],
+            SAMSUNG: ["Linha A (A01 a A73)", "Linha S (S10 a S23 Ultra)", "Linha M (M13 a M54)", "Linha Note"],
+            MOTOROLA: ["Motorola Linha G", "Motorola Linha Edge", "Motorola Linha E", "Motorola Linha One/Fusion"],
+            XIAOMI: ["Redmi Note (8 a 13 Pro)", "Poco X/F Series", "Poco M/C Series", "Xiaomi Mi Series"],
+            REALME: ["Realme C Series", "Realme GT", "Realme Pro+", "Realme 7/8/9/10/11"],
+            INFINIX: ["Infinix Hot Series", "Infinix Note Series"]
+        };
+
+        function updateModels() {
+            const b = document.getElementById('brand').value;
+            const m = document.getElementById('model');
+            m.innerHTML = '<option value="">LINHA / MODELO</option>';
+            if(b) devices[b].sort().forEach(item => { m.innerHTML += `<option value="${item}">${item}</option>`; });
+        }
+
+        function autenticar() {
+            const key = document.getElementById('key-input').value.trim();
+            db.ref('chaves/' + key).once('value').then((snap) => {
+                if(snap.exists()){
+                    const d = snap.val();
+                    if(d.validade && d.validade < new Date().getTime()) return alert("EXPIRADA!");
+                    document.getElementById('login-screen').classList.add('hidden');
+                    document.getElementById('main-panel').classList.remove('hidden');
+                    document.getElementById('info-key').innerText = key;
+                    document.getElementById('info-validade').innerText = d.validade ? new Date(d.validade).toLocaleString('pt-BR') : "PERMANENTE";
+                } else { alert("CHAVE INVÁLIDA!"); }
+            });
+        }
+
+        function switchTab(t) {
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById('content-' + t).classList.remove('hidden');
+            document.getElementById('btn-tab-' + t).classList.add('active');
+        }
+
+        function gerarSensi() {
+            if(!document.getElementById('model').value) return alert("Selecione a Linha!");
+            const res = document.getElementById('results');
+            res.classList.remove('hidden'); res.innerHTML = "";
+            ['GERAL', 'RED DOT', 'MIRA 2X', 'MIRA 4X'].forEach(l => {
+                const val = Math.floor(Math.random() * (200 - 175) + 175);
+                res.innerHTML += `<div class="card-sensi p-4 rounded-2xl text-center"><p class="text-[8px] text-zinc-500 font-black mb-1 uppercase">${l}</p><p class="text-2xl font-cyber font-bold text-white">${val}</p></div>`;
+            });
+            res.innerHTML += `<div class="col-span-1 card-especial p-4 rounded-2xl text-center"><p class="text-[8px] text-purple-400 font-black mb-1 uppercase">DPI</p><p class="text-xl font-cyber font-bold text-white">${Math.floor(Math.random() * (850-550)+550)}</p></div>`;
+            res.innerHTML += `<div class="col-span-1 card-especial p-4 rounded-2xl text-center"><p class="text-[8px] text-purple-400 font-black mb-1 uppercase">BOTÃO</p><p class="text-xl font-cyber font-bold text-white">${Math.floor(Math.random() * (55-45)+45)}%</p></div>`;
+        }
+    </script>
+</body>
+</html>
